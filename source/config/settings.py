@@ -7,5 +7,4 @@ class AppConfig(BaseSettings):
     class Config:
         env_file = ".env"
 
-
 settings = AppConfig()

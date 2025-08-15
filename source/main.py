@@ -1,73 +1,82 @@
+from __future__ import annotations
+import uuid, json, time
+import streamlit as st
 
-import os
-from typing import List, Dict, Generator, Optional
-try:
-    from openai import OpenAI
-except ImportError as e:
-    raise SystemExit(
-        "The 'openai' package is required. Install with: pip install openai>=1.0.0"
-    ) from e
+from agent.orchestrator import ConversationState, finalize_to_json
+from services.runner import handle_user_turn
 
+from dotenv import load_dotenv
+load_dotenv()
 
-DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
+st.set_page_config(page_title="Nusantara CaRas", page_icon="🇮🇩", layout="centered")
+st.title("🇮🇩 Nusantara CaRas — Medical Intake")
 
+if "session_id" not in st.session_state:
+    st.session_state.session_id = "sess_" + uuid.uuid4().hex[:10]
+if "state" not in st.session_state:
+    st.session_state.state = ConversationState(
+        session_id=st.session_state.session_id,
+        user_id="webuser",
+        tz="Asia/Jakarta",
+        eval_seconds=60
+    )
+if "log" not in st.session_state:
+    st.session_state.log = []
 
-class ChatBackbone:
-    def __init__(
-        self,
-        api_key: Optional[str] = None,
-        model: str = "gpt-4o-mini",
-        temperature: float = 0.2,
-        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
-    ):
-        if api_key:
-            os.environ["OPENAI_API_KEY"] = api_key
-        elif not os.getenv("OPENAI_API_KEY"):
-            raise ValueError("OpenAI API key not provided. Set OPENAI_API_KEY or pass api_key.")
-        self.client = OpenAI()
-        self.model = model
-        self.temperature = temperature
-        self._system_prompt = system_prompt
-        self.messages: List[Dict[str, str]] = [{"role": "system", "content": self._system_prompt}]
+state: ConversationState = st.session_state.state
+is_thinking = getattr(state, "is_thinking", False)
 
-    def set_system_prompt(self, prompt: str):
-        self._system_prompt = prompt
-        self.reset()
+for m in st.session_state.log:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
 
-    def reset(self):
-        self.messages = [{"role": "system", "content": self._system_prompt}]
+prompt = st.chat_input(
+    "Tulis pesan Anda…",
+    disabled=is_thinking
+)
 
-    def history(self) -> List[Dict[str, str]]:
-        return list(self.messages)
+if prompt and not is_thinking:
+    st.session_state.log.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-    def complete(self, user_content: str) -> str:
-        self.messages.append({"role": "user", "content": user_content})
-        res = self.client.chat.completions.create(
-            model=self.model,
-            temperature=self.temperature,
-            messages=self.messages,
-            stream=False,
-        )
-        reply = res.choices[0].message.content or ""
-        self.messages.append({"role": "assistant", "content": reply})
-        return reply
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        buf = []
 
-    def stream(self, user_content: str) -> Generator[str, None, None]:
-        self.messages.append({"role": "user", "content": user_content})
-        acc = []
-        stream = self.client.chat.completions.create(
-            model=self.model,
-            temperature=self.temperature,
-            messages=self.messages,
-            stream=True,
-        )
-        for chunk in stream:
-            if not chunk.choices:
-                continue
-            delta = chunk.choices[0].delta
-            part = getattr(delta, "content", None) or ""
-            if part:
-                acc.append(part)
-                yield part
-        if acc:
-            self.messages.append({"role": "assistant", "content": "".join(acc)})
+        for ev in handle_user_turn(state, prompt):
+            t = ev.get("type")
+            if t == "token":
+                buf.append(ev.get("content", ""))
+                placeholder.markdown("".join(buf))
+            elif t == "event":
+                name = ev.get("name")
+                if name == "stage_changed" and ev.get("payload", {}).get("stage") == "EVALUATING":
+                    state.is_thinking = True
+                    break
+        final_text = "".join(buf).strip()
+        if final_text:
+            st.session_state.log.append({"role": "assistant", "content": final_text})
+
+    if getattr(state, "is_thinking", False):
+        st.experimental_rerun()
+
+# --- thinking state (mute input, show spinner) ---
+if getattr(state, "is_thinking", False):
+    with st.chat_message("assistant"):
+        with st.spinner("…"):
+            # simulate/perform evaluation
+            time.sleep(getattr(state, "eval_seconds", 60))
+            # produce final JSON-only message
+            doc = finalize_to_json(state)  # must return dict with lead-spec shape
+            json_text = json.dumps(doc, ensure_ascii=False)
+    # append JSON as normal assistant message
+    st.session_state.log.append({"role": "assistant", "content": json_text})
+    state.is_thinking = False
+    # Optionally mark conversation closed if you don’t want more input after JSON:
+    state.conversation_closed = True
+    st.experimental_rerun()
+
+# optional: lock input after final JSON
+if getattr(state, "conversation_closed", False):
+    st.chat_input("Sesi selesai.", disabled=True)
