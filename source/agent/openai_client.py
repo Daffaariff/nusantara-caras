@@ -45,7 +45,7 @@ PROPOSE_PARAMS_TOOL = {
         "description": "Propose field values with fuzzy weight (0..1). Include 'language' and 'safety' if relevant.",
         "parameters": {
             "type": "object",
-            "properties": {                           # <-- REQUIRED by OpenAI
+            "properties": {
                 "fields": {
                     "type": "object",
                     "description": "Arbitrary field map for the intake form.",
