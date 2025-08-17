@@ -5,10 +5,10 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 
-api_key = os.getenv("OPENAI_API_KEY")
-base_url = os.getenv("BASE_URL")
-model_name = os.getenv("MODEL_NAME")
-SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT")
+api_key = os.getenv("SEA_LION_API_KEY")
+base_url = os.getenv("SEA_LION_BASE_URL")
+model_name = os.getenv("SEA_LION_MODEL_NAME")
+SYSTEM_PROMPT = os.getenv("SEA_LION_SYSTEM_PROMPT")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=api_key, base_url=base_url)

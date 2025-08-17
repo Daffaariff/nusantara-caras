@@ -49,6 +49,10 @@
     .list li{margin:6px 0}
     footer{border-top:1px solid var(--border); color:var(--muted); padding:28px 0; font-size:14px}
     @media (max-width:980px){ .hero{grid-template-columns:1fr} .navlinks{display:none} }
+    .flow-block {
+      margin-top: 50px;
+      margin-bottom: 20px; /* adjust spacing as needed */
+    }
   </style>
 </head>
 <body>
@@ -70,7 +74,7 @@
   <main class="container">
     <section class="hero">
       <div class="card">
-        <span class="eyebrow">POC — Cultural Medical Intelligence</span>
+        <span class="eyebrow">POC — Nusantara CaRas (Cageur and waRas)</span>
         <h1>SEA‑LION × MedGEMMA with Self‑Evolving RAG</h1>
         <p class="lead">Expanding diagnostic access for <strong>Sundanese</strong> & <strong>Javanese</strong> speakers with a culturally fluent intake frontend and medically grounded backend.</p>
         <div class="cta">
@@ -172,31 +176,374 @@
     </section>
 
     <section id="demo">
-      <h2>POC Links & Screenshots</h2>
-      <div class="card">
-        <p>Add your live links below. For screenshots, place images in <span class="kbd">/source/assets/</span> and link them.</p>
+  <h2>POC Links & Screenshots</h2>
+
+  <div class="card">
+    <ul class="list">
+      <li><strong>Demo (frontend):</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
+      <li><strong>API notebook / Colab:</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
+      <li><strong>Model cards:</strong> <a href="#" target="_blank" rel="noopener">SEA-LION</a> • <a href="#" target="_blank" rel="noopener">MedGEMMA</a></li>
+      <li><strong>Datasets & guidelines (RAG):</strong> <a href="#" target="_blank" rel="noopener">links-here</a></li>
+    </ul>
+  </div>
+
+  <h2 class="flow-block">SEA-LION Intake flow</h2>
+  <p class="lead">The intake process is designed to be culturally fluent and user-friendly, to gather structured information of user condition. then will be forwaded in english to the MedGEMMA backend for diagnosing user condition.</p>
+  <div style="margin-top:16px">
+        <figure class="card">
+          <img src="source/assets/openerr.png" alt="SEA‑LION intake screenshot 1" />
+          <figcaption><strong>Step 1 — Intake & Safety Triage.</strong> SEA‑LION greets in Sundanese/Javanese, confirms non‑emergency, acknowledges AI, and secures user consent.</figcaption>
+        </figure>
+        <figure class="card">
+          <img src="source/assets/some-info.png" alt="SEA‑LION intake screenshot 2" />
+          <figcaption><strong>Step 2 — Structured History.</strong> The bot gathers chief complaint and HPI (onset, location, duration, character, aggravating/alleviating factors, radiation, timing, severity).</figcaption>
+        </figure>
+        <figure class="card">
+          <img src="source/assets/closer.png" alt="SEA‑LION intake screenshot 3" />
+          <figcaption><strong>Step 3 — Wrap‑up & Confirmation.</strong> Review of systems, past medical history, and meds/allergies are captured; the user confirms before JSON is emitted.</figcaption>
+        </figure>
+      </div>
+
+  <div class="card" style="margin-top:16px">
+    <h4 style="margin-top:0">Target JSON Output</h4>
+    <pre style="white-space:pre-wrap; background:#0b132b; border:1px solid var(--border); padding:16px; border-radius:12px; overflow:auto;">
+{
+  "tool": "medical_intake",
+  "arguments": {
+    "consent": {
+      "terms_agreed": true,
+      "is_emergency": false,
+      "acknowledges_ai": true
+    },
+    "chief_complaint": "Toothache",
+    "history_present_illness": {
+      "onset": "3 days ago upon waking",
+      "location": "Backteeth",
+      "duration": "Intermittent, lasting minutes to hours",
+      "character": "Like being pressed with pulsating sensation",
+      "aggravating_factors": "cold water",
+      "alleviating_factors": "warm water",
+      "radiation": "None",
+      "timing": "Worse in the morning",
+      "severity": 6
+    },
+    "review_of_systems": {
+      "general": [],
+      "heent": [],
+      "respiratory": [],
+      "gastrointestinal": [],
+      "musculoskeletal": []
+    },
+    "past_medical_history": {
+      "chronic_illnesses": ["Hypertension"],
+      "past_surgeries": null,
+      "hospitalizations": null
+    },
+    "medications_and_allergies": {
+      "current_medications": [
+        {
+          "name": "Amlodipine",
+          "type": "prescription"
+        }
+      ],
+      "allergies": []
+    }
+  }
+}
+
+
+    </pre>
+    <p class="lead">This JSON is posted to the MedGEMMA backend (with RAG + guardrails) for guideline-grounded reasoning.</p>
+  </div>
+
+  <h2 class="flow-block">MedGEMMA Backend Flow</h2>
+  <p class="lead">The backend processes the intake JSON, retrieves relevant guidelines, and generates a structured response with differential diagnoses, recommended actions, and safety checks.</p>
+  <div style="margin-top:16px">
+    <figure class="card">
+      <img src="source/assets/medgemma-flow.png" alt="MedGEMMA backend flow" />
+      <figcaption><strong>MedGEMMA Backend Flow</strong>
         <ul class="list">
-          <li><strong>Demo (frontend):</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
-          <li><strong>API notebook / Colab:</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
-          <li><strong>Model cards:</strong> <a href="#" target="_blank" rel="noopener">SEA‑LION</a> • <a href="#" target="_blank" rel="noopener">MedGEMMA</a></li>
-          <li><strong>Datasets & guidelines (RAG):</strong> <a href="#" target="_blank" rel="noopener">links-here</a></li>
+          <li>Receives intake JSON from SEA‑LION + historical illnese of user based on history (self-RAG)</li>
+          <li>if necessary the MedGEMMA would use the tools/base knowlege to generate the response </li>
+          <li>Retrieves relevant guidelines using RAG.</li>
+          <li>Generates differential diagnoses and recommended actions.</li>
+          <li>Checks for drug interactions and safety issues.</li>
+          <li>Returns structured response to SEA‑LION for user feedback.</li>
         </ul>
-      </div>
-      <div class="grid cols-3" style="margin-top:16px">
-        <figure class="card">
-          <img src="source/assets/screen-intake.png" alt="SEA‑LION intake screenshot" />
-          <figcaption>SEA‑LION intake — Sundanese/Javanese friendly UI.</figcaption>
-        </figure>
-        <figure class="card">
-          <img src="source/assets/screen-backend.png" alt="MedGEMMA backend screenshot" />
-          <figcaption>Backend evidence & explanations (grounded).</figcaption>
-        </figure>
-        <figure class="card">
-          <img src="source/assets/screen-rag.png" alt="RAG pipeline screenshot" />
-          <figcaption>Self‑evolving RAG monitor & feedback loop.</figcaption>
-        </figure>
-      </div>
-    </section>
+
+    <h4 style="margin-top:2">example backend JSON Output</h4>
+        <pre style="white-space:pre-wrap; background:#0b132b; border:1px solid var(--border); padding:16px; border-radius:12px; overflow:auto;">
+{
+    "diagnosis": "Pulpitis",
+    "hypothesis": "The patient is likely experiencing pulpitis, which is inflammation of the dental pulp, possibly due to caries or irritation, leading to intermittent pain exacerbated by cold stimuli and relieved by warmth. This could also indicate a dental abscess if there is an associated infection.",
+    "history_and_examination_findings": "The patient presents with a toothache that started 3 days ago, localized to the back teeth, characterized as a pressing, pulsating sensation. The pain is intermittent, lasting from minutes to hours, worsens in the morning, and is aggravated by cold water while alleviated by warm water. Severity is rated as 6 on a pain scale.",
+    "investigation_plan": "A dental examination is necessary, including visual inspection for caries, percussion testing for sensitivity, and possibly radiographs to assess for abscess formation or pulp involvement.",
+    "management_plan": "If diagnosed with pulpitis, options include restorative treatment such as fillings or possibly root canal therapy. If an abscess is present, appropriate antibiotics and drainage may be required.",
+    "prognosis": "With timely dental intervention, the prognosis is generally good. However, untreated pulpitis can progress to more severe complications, including tooth loss.",
+    "doctors_prescription": "Prescription for analgesics (e.g., ibuprofen) for pain management and, if an abscess is identified, antibiotics such as amoxicillin or clindamycin depending on patient allergy history.",
+    "summary": "A patient presents with a 3-day history of intermittent toothache localized to the back teeth, characterized by a pulsating sensation, worsened by cold and improved by warm stimuli. The clinical suspicion includes pulpitis or possibly a dental abscess."
+}
+    </pre>
+  </div>
+
+    <!-- SEA-LION Frontend Flow — Localized Response -->
+
+<h2 class="flow-block">SEA-LION Frontend Flow (Post-Backend)</h2>
+<p class="lead">
+  After the backend (MedGEMMA + RAG) returns the analysis JSON, <strong>SEA-LION</strong> renders
+  the response into a localized patient-friendly format (Sundanese/Javanese). An example of the
+  rendered output is shown below.
+</p>
+
+    <article>
+      <h3>🦷 Laporan Kaséhatan Anjeun</h3>
+      <p><strong>Hatur nuhun tos ngantosan, ieu diagonos sareng anjuran ti dokter:</strong></p>
+      <hr style="border:0;border-top:1px solid var(--border)">
+
+      <h4>📋 Gejala &amp; Kaayaan</h4>
+      <p>
+        Anjeun parantos ngalaman nyeri huntu kira-kira <strong>3 dinten</strong>. Lokasina di huntu tukang,
+        karasana <strong>denyut jeung diteken</strong>, datangna henteu tetep, tiasa sababaraha menit dugi sababaraha jam.
+        Nyeri langkung karasa <strong>isuk-isuk</strong>, beuki nyeri lamun kena <strong>cai tiis</strong>, sareng rada
+        hampang ku <strong>cai haneut</strong>. Skala nyeri anjeun ayeuna sakitar <strong>6 tina 10</strong>.
+      </p>
+
+      <h4>🩺 Diagnosis &amp; Pamanggih Dokter</h4>
+      <ul class="list">
+        <li><strong>Pulpitis</strong> → radang dina sélip huntu kusabab karies atanapi iritasi.</li>
+        <li><strong>Abses huntu</strong> → upami aya inféksi anu nyertai.</li>
+      </ul>
+
+      <h4>🔍 Rencana Pamariksaan</h4>
+      <ul class="list">
+        <li>Pamariksaan langsung huntu pikeun ningali karies.</li>
+        <li>Tés sensitipitas ku diketok huntu.</li>
+        <li>Rontgen pikeun ningali naha aya abses atanapi karusakan jero.</li>
+      </ul>
+
+      <h4>💊 Rencana Pangobatan</h4>
+      <ul class="list">
+        <li><strong>Upami pulpitis:</strong> tambalan atanapi perawatan saluran akar.</li>
+        <li><strong>Upami aya abses:</strong> antibiotik sareng tindakan pikeun ngaleupaskeun nanah.</li>
+        <li>Kanggo nyeri ayeuna: tiasa nganggo <strong>obat nyeri (misalna ibuprofen)</strong> sasuai dosis dokter.</li>
+      </ul>
+
+      <h4>📈 Kasempetan Cageur</h4>
+      <p>
+        Lamun gancang diubaran, kasempetan cageurna saé pisan. Nanging, lamun teu diubaran, pulpitis tiasa janten langkung parna
+        sareng ngakibatkeun <strong>leungitna huntu</strong>.
+      </p>
+
+      <h4>📝 Resep Dokter</h4>
+      <ul class="list">
+        <li><strong>Obat nyeri</strong>: ibuprofen (gumantung kana dosis &amp; kondisi anjeun).</li>
+        <li><strong>Antibiotik</strong>: amoxicillin atanapi clindamycin (lamun aya tanda inféksi, ogé gumantung kana riwayat alergi).</li>
+      </ul>
+
+      <h4>🏥 Rumah Sakit / Apotek Nu Disarankeun</h4>
+      <ul class="list">
+        <li>🏥 <strong>RSUD Kota Bandung</strong> – Jl. Rumah Sakit No.22, Kota Bandung.</li>
+        <li>🏥 <strong>RS Gigi dan Mulut Unpad</strong> – Jl. Sekeloa Selatan No.1, Bandung.</li>
+        <li>💊 <strong>Apotek Kimia Farma Dago</strong> – Jl. Ir. H. Juanda No.60, Bandung.</li>
+      </ul>
+
+      <h4>🙏 Kasimpulan</h4>
+      <p>
+        Mangga enggal konsultasi deui ka dokter gigi pikeun perlakuan anu langkung pas.
+        Simkuring ngiring mendoakeun anjeun <strong>enggal cageur sareng langkung nyaman</strong>.
+      </p>
+
+      <p class="kbd" style="display:inline-block">
+        ⚠️ Catetan Penting: Ieu mangrupikeun laporan tina dokter. Mangga tetep nuturkeun pituduh dokter gigi anjeun.
+      </p>
+    </article>
+  </div>
+
+
+  <!-- Dev Notes: How SEA-LION maps backend JSON -> localized UI -->
+  <div class="card">
+  <h3 style="margin-top:0">Notes — Mapping Backend JSON → UI</h3>
+  <ul class="list">
+    <li><strong>Input:</strong> Backend JSON (diagnosis, hypothesis, plans, prescription, summary, etc.).</li>
+    <li><strong>Localization:</strong> SEA-LION translates and adapts the content into local languages (Sundanese/Javanese) and cultural context (greetings, word choices).</li>
+    <li><strong>Rendering:</strong> Uses card and list components to structure the content, adding icons/emoji for readability.</li>
+    <li><strong>Safety:</strong> Inserts disclaimers and guardrails (without replacing professional medical advice).</li>
+    <li><strong>Optional:</strong> Integrates maps/local services to suggest nearby hospitals and pharmacies based on patient location.</li>
+  </ul>
+</div>
+
+
+    <h4 style="margin-bottom:8px">Pseudo-code</h4>
+    <pre style="white-space:pre-wrap; background:#0b132b; border:1px solid var(--border); padding:12px; border-radius:12px; overflow:auto;">
+const localized = localizeFromBackendJson(backendJson, { locale: "su-ID" });
+renderReport(localized, {
+  sections: ["symptoms", "dx", "investigations", "management", "prognosis", "rx", "facilities", "summary"],
+  safety: true,
+  withMapLinks: true
+});
+    </pre>
+  </div>
+</div>
+
+<!-- Self-Evolving RAG — Patient Feedback Loop -->
+<h2 class="flow-block">Self-Evolving RAG (Patient Feedback → Vector DB → Future Recall)</h2>
+<p class="lead">
+  One week after the initial guidance, the patient receives a short check-in. Their feedback (symptom resolution,
+  confirmed diagnosis, treatment taken, outcomes) is normalized and stored as embeddings in a vector database.
+  Future cases with similar presentations can retrieve this feedback to improve grounding and recommendations.
+</p>
+
+<div class="grid cols-3" style="margin-top:16px">
+  <div class="card">
+    <h3 style="margin-top:0">1) Patient Check-in</h3>
+    <ul class="list">
+      <li>SEA-LION sends a 1-week follow-up (chat/SMS/WhatsApp).</li>
+      <li>Collects: outcome (resolved/not), confirmed diagnosis, meds taken, adverse effects, free-text notes.</li>
+      <li>De-identifies PII before storage; keeps minimal linkage (hashed episode ID).</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">2) Outcome Labeling</h3>
+    <ul class="list">
+      <li>Label: <em>diagnosis_success</em> (true/false/unknown).</li>
+      <li>Quality tags: guideline_adherence, side_effects, followup_needed.</li>
+      <li>Auto-score similarity between original HPI & confirmed diagnosis.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">3) Vectorize & Upsert</h3>
+    <ul class="list">
+      <li>Build a concise “case card” text (HPI → DX → RX → Outcome).</li>
+      <li>Create embedding and <strong>upsert</strong> to Vector DB with metadata.</li>
+      <li>Backend retrieval uses filters (locale, region, specialty, recency) and re-ranks.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <h3 style="margin-top:0">Feedback Payload (Example)</h3>
+    <pre style="white-space:pre-wrap; background:#0b132b; border:1px solid var(--border); padding:12px; border-radius:12px; overflow:auto;">
+{
+  "episode_id": "ep_9b1f...e7c",
+  "patient_locale": "su-ID",
+  "initial": {
+    "chief_complaint": "Toothache",
+    "hpi": {
+      "onset": "3 days",
+      "location": "posterior teeth",
+      "aggravating": "cold water",
+      "relieving": "warm water",
+      "severity": 6
+    },
+    "provisional_dx": ["pulpitis", "dental abscess"],
+    "plan": ["analgesic", "dental x-ray", "consider RCT"]
+  },
+  "followup_after_days": 7,
+  "feedback": {
+    "diagnosis_success": true,
+    "confirmed_dx": "pulpitis",
+    "treatment_taken": ["ibuprofen", "root canal therapy"],
+    "outcome_summary": "Pain resolved within 3 days after RCT.",
+    "adverse_effects": [],
+    "notes": "Prompt referral helped reduce pain quickly."
+  },
+  "privacy": { "pii_removed": true }
+}
+    </pre>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">Backend Use (Pseudo-code)</h3>
+    <pre style="white-space:pre-wrap; background:#0b132b; border:1px solid var(--border); padding:12px; border-radius:12px; overflow:auto;">
+// Upsert feedback case
+const caseCard = toCaseCardText(payload);     // HPI → DX → RX → Outcome
+const emb = embed(caseCard);
+vectorDB.upsert({
+  id: payload.episode_id,
+  embedding: emb,
+  metadata: {
+    locale: payload.patient_locale,
+    confirmed_dx: payload.feedback.confirmed_dx,
+    diagnosis_success: payload.feedback.diagnosis_success,
+    recency_days: payload.followup_after_days
+  }
+});
+
+// Retrieval in future similar cases
+const queryCard = toCaseQueryText(currentPatientIntakeJson);
+const qEmb = embed(queryCard);
+const neighbors = vectorDB.search(qEmb, {
+  topK: 10,
+  filter: { locale: "su-ID" }
+});
+const groundedContext = rerankAndSummarize(neighbors);
+const finalAnswer = medGEMMA.generate({
+  intakeJson: currentPatientIntakeJson,
+  retrievedContext: groundedContext,
+  guardrails: true
+});
+    </pre>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <h3 style="margin-top:0">Governance & Safety</h3>
+  <ul class="list">
+    <li>De-identify feedback, store only minimal episode linkage.</li>
+    <li>Opt-in consent at intake; opt-out available at any time.</li>
+    <li>Bias checks: avoid over-weighting single-region outcomes; use recency decay.</li>
+    <li>Audit trails for retrievals influencing recommendations.</li>
+  </ul>
+</div>
+
+</section>
+
+<!-- Possible Future Improvements -->
+<!-- Possible Future Improvements -->
+<section id="future">
+  <h2>Possible Future Improvements</h2>
+
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>Language Consistency</h3>
+      <ul class="list">
+        <li>Guarantee fully localized outputs without fallback to English</li>
+        <li>Schema-based outputs to prevent bilingual drift</li>
+        <li>Few-shot examples to enforce style consistency</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Self-RAG Feedback Loop</h3>
+      <ul class="list">
+        <li>Use patient follow-up outcomes to strengthen retrieval</li>
+        <li>Store confirmed cases in vector DB for future reuse</li>
+        <li>Continuously improve diagnostic grounding</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:16px">
+    <div class="card">
+      <h3>On-Device & Offline Modes</h3>
+      <ul class="list">
+        <li>Lightweight SEA-LION models for low-end Android devices</li>
+        <li>Store-and-forward for poor connectivity regions</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Safety & Guardrails</h3>
+      <ul class="list">
+        <li>Red-flag detection and emergency escalation paths</li>
+        <li>Automatic guardrails for unsafe or uncertain outputs</li>
+      </ul>
+    </div>
+  </div>
+</section>
 
     <section id="impact">
       <h2>Impact</h2>
