@@ -65,7 +65,7 @@
           <a href="#solution">Solution</a>
           <a href="#architecture">Architecture</a>
           <a href="#demo">Demo</a>
-          <a href="#roadmap">Roadmap</a>
+          <a href="#future">Future Improvements</a>
         </div>
       </nav>
     </div>
@@ -115,31 +115,44 @@
     </section>
 
     <section id="solution">
-      <h2>Solution</h2>
-      <div class="grid cols-3">
-        <div class="card">
-          <h3>SEA‑LION Frontend</h3>
-          <ul class="list">
-            <li>Native intake in Sundanese/Javanese; code‑switch aware.</li>
-            <li>Emergency triage & culturally appropriate prompts.</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>MedGEMMA Backend</h3>
-          <ul class="list">
-            <li>Diagnosis support & guideline grounding via RAG.</li>
-            <li>Guardrails for scope & safety; drug‑interaction checks.</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Self‑Evolving RAG</h3>
-          <ul class="list">
-            <li>Continuously improves retrieval quality using real feedback (offline pipeline).</li>
-            <li>Localized knowledge base: Bahasa Indonesia + regional terms.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
+  <h2>Solution</h2>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>SEA-LION Frontend</h3>
+      <ul class="list">
+        <li>Native intake in Sundanese and Javanese with strict local-language consistency</li>
+        <li>Emergency triage with culturally appropriate prompts</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>MedGEMMA Backend</h3>
+      <ul class="list">
+        <li>Diagnosis support and guideline grounding via RAG</li>
+        <li>Guardrails for scope and safety with drug-interaction checks</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid cols-2" style="margin-top:16px">
+    <div class="card">
+      <h3>Self-Evolving RAG</h3>
+      <ul class="list">
+        <li>Uses patient follow-up feedback to continuously improve retrieval</li>
+        <li>Stores confirmed cases in vector DB for reuse on similar conditions</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>Accessibility & Safety</h3>
+      <ul class="list">
+        <li>Lightweight, offline-ready SEA-LION for low-connectivity regions</li>
+        <li>Red-flag detection and automatic escalation to emergency care</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 
     <section id="architecture">
       <h2>Architecture</h2>
@@ -180,10 +193,10 @@
 
   <div class="card">
     <ul class="list">
-      <li><strong>Demo (frontend):</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
-      <li><strong>API notebook / Colab:</strong> <a href="#" target="_blank" rel="noopener">link-here</a></li>
-      <li><strong>Model cards:</strong> <a href="#" target="_blank" rel="noopener">SEA-LION</a> • <a href="#" target="_blank" rel="noopener">MedGEMMA</a></li>
-      <li><strong>Datasets & guidelines (RAG):</strong> <a href="#" target="_blank" rel="noopener">links-here</a></li>
+      <li><strong>Demo (sundanese prototype):</strong> <a href="https://huggingface.co/spaces/Daffa19/Nusantara-caras" target="_blank" rel="noopener">link-here</a></li>
+      <li><strong>API SEA-LION:</strong> <a href="https://docs.sea-lion.ai/guides/inferencing/api" target="_blank" rel="noopener">link-here</a></li>
+      <li><strong>Model cards:</strong> <a href="https://huggingface.co/aisingapore/Gemma-SEA-LION-v3-9B-IT" target="_blank" rel="noopener">SEA-LION</a> • <a href="https://huggingface.co/google/medgemma-4b-it" target="_blank" rel="noopener">MedGEMMA</a></li>
+      <li><strong>guidelines (RAG):</strong> <a href="#" target="_blank" rel="noopener">links-here</a></li>
     </ul>
   </div>
 
@@ -388,7 +401,7 @@ renderReport(localized, {
 <!-- Self-Evolving RAG — Patient Feedback Loop -->
 <h2 class="flow-block">Self-Evolving RAG (Patient Feedback → Vector DB → Future Recall)</h2>
 <p class="lead">
-  One week after the initial guidance, the patient receives a short check-in. Their feedback (symptom resolution,
+  One week (this can be adjusted) after the initial guidance, the patient receives a short check-in. Their feedback (symptom resolution,
   confirmed diagnosis, treatment taken, outcomes) is normalized and stored as embeddings in a vector database.
   Future cases with similar presentations can retrieve this feedback to improve grounding and recommendations.
 </p>
@@ -502,7 +515,6 @@ const finalAnswer = medGEMMA.generate({
 </section>
 
 <!-- Possible Future Improvements -->
-<!-- Possible Future Improvements -->
 <section id="future">
   <h2>Possible Future Improvements</h2>
 
@@ -565,37 +577,10 @@ const finalAnswer = medGEMMA.generate({
       </div>
     </section>
 
-    <section id="roadmap">
-      <h2>Roadmap</h2>
-      <div class="grid cols-3">
-        <div class="card">
-          <h3>Phase 0 — POC</h3>
-          <ul class="list">
-            <li>Static demo + screenshots + links</li>
-            <li>Emergency triage & basic RAG</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Phase 1 — Pilot</h3>
-          <ul class="list">
-            <li>User testing with community partners</li>
-            <li>Data governance & feedback ingestion</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Phase 2 — Scale</h3>
-          <ul class="list">
-            <li>Broader guideline coverage</li>
-            <li>Offline/low‑bandwidth modes</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-
     <section id="contact">
       <h2>Contact</h2>
       <div class="card">
-        <p>Questions, partnerships, or pilots? Reach out: <a href="mailto:you@example.com">you@example.com</a></p>
+        <p>if you have any questions, please contact our representative team member: <a href="mailto:daffaarifadilah@gmail.com">daffaarifadilah@gmail.com</a></p>
       </div>
     </section>
   </main>
