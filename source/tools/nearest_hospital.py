@@ -168,6 +168,33 @@ class NearestFacilityFinder:
                 uniq.append(r_)
         return uniq
 
+    @staticmethod
+    def map_result(bundle: dict) -> list[str]:
+        if not bundle or "results" not in bundle:
+            return []
+
+        mapped = []
+        print(bundle["results"])
+        for r in bundle["results"]:
+            tags = r.get("tags", {}) or {}
+            name = (
+                tags.get("name")
+                or tags.get("name:en")
+                or tags.get("operator")
+                or "Tidak bernama"
+            )
+            kind = r.get("kind", "fasilitas")
+            if "hospital" in kind:
+                kind = ""  # drop redundant word
+            distance = r.get("distance_km")
+
+            if distance is not None:
+                mapped.append(f"{kind} {name} jarak {distance} km")
+            else:
+                mapped.append(f"{kind} {name}")
+        return mapped
+
+
     # ---- public API ----------------------------------------------------------
     async def search(
         self,

@@ -54,8 +54,9 @@ async def process_doctor_report(user_id: str, chat_uuid: str, history_text: str)
         doctor_prompt = format_user_prompt(DOCTOR_PROMPT_TEMPLATE, parsed)
         doctor_process = await MDA.arun(content=doctor_prompt)
 
+        doctor_process['display_name'], doctor_process['lang'], doctor_process['hospital'] = display_name, lang, combined
         final_report_prompt = format_user_prompt(FINAL_REPORT_TEMPLATE, doctor_process)
-        final_report = await FRA.arun(content=final_report_prompt, display_name=display_name, hospital=combined, lang=lang )
+        final_report = await FRA.arun(content=final_report_prompt)
 
         cur.execute("""INSERT INTO chat_messages (chat_id, sender, content)
                        VALUES (%s,'bot',%s)""",

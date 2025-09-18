@@ -9,7 +9,7 @@ from .tasks import process_doctor_report
 from .wsocket import ws_manager
 import re
 from agents import SCA, SPA
-from utils import get_conn, require_user, validate_uuid
+from utils import get_conn, require_user, validate_uuid, decode_jwt_token
 from schemas import StartChat, SendMessage
 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -312,15 +312,117 @@ def clear_user_chats(user_id: str = Depends(require_user)):
         cur.close()
         conn.close()
 
+async def verify_chat_access(user_id: str, chat_id: str) -> bool:
+    """Verify that user has access to the specified chat"""
+    conn = get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT 1 FROM chat_sessions WHERE id=%s::uuid AND user_id=%s::uuid",
+            (chat_id, user_id),
+        )
+        return bool(cur.fetchone())
+    except Exception as e:
+        logger.error(f"Error verifying chat access: {str(e)}")
+        return False
+    finally:
+        cur.close()
+        conn.close()
+
 @router.websocket("/ws/{chat_id}")
 async def websocket_endpoint(websocket: WebSocket, chat_id: str):
-    await ws_manager.connect(chat_id, websocket)
+    """Enhanced WebSocket endpoint with JWT authentication"""
+    validate_uuid(chat_id)
+
+    # Try to get user_id from connection
+    user_id = await get_user_from_websocket(websocket)
+
+    # Connect to WebSocket manager
+    await ws_manager.connect(chat_id, websocket, user_id)
+
+    # If no authentication, inform client they need to authenticate
+    if not user_id:
+        try:
+            await websocket.send_json({
+                "type": "auth_required",
+                "message": "Please authenticate by sending your token"
+            })
+        except:
+            # Connection might be closed
+            pass
+
     try:
         while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(f"Echo: {data}")
+            try:
+                raw_data = await websocket.receive_text()
+                data = json.loads(raw_data)
+            except json.JSONDecodeError:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                })
+                continue
+            except Exception as e:
+                logger.error(f"WebSocket receive error: {str(e)}")
+                break
+
+            message_type = data.get("type")
+
+            # Handle authentication first
+            if message_type == "auth":
+                new_user_id = await handle_websocket_auth(data)
+                if new_user_id:
+                    # Update connection with authenticated user
+                    ws_manager.disconnect(chat_id, websocket, user_id)
+                    user_id = new_user_id
+                    await ws_manager.connect(chat_id, websocket, user_id)
+
+                    # Verify user has access to this chat
+                    if await verify_chat_access(user_id, chat_id):
+                        await websocket.send_json({
+                            "type": "auth_success",
+                            "message": "Authentication successful"
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "auth_error",
+                            "message": "You don't have access to this chat"
+                        })
+                        break
+                else:
+                    await websocket.send_json({
+                        "type": "auth_error",
+                        "message": "Authentication failed - invalid token"
+                    })
+                continue
+
+            # All other message types require authentication
+            if not user_id:
+                await websocket.send_json({
+                    "type": "auth_required",
+                    "message": "Please authenticate first"
+                })
+                continue
+
+            # Handle authenticated messages
+            if message_type == "send_message":
+                await handle_websocket_message(websocket, chat_id, data, user_id)
+            elif message_type == "typing":
+                await handle_typing_indicator(chat_id, data, user_id)
+            elif message_type == "ping":
+                await websocket.send_json({"type": "pong"})
+            else:
+                await websocket.send_json({
+                    "type": "error",
+                    "message": f"Unknown message type: {message_type}"
+                })
+
     except WebSocketDisconnect:
-        ws_manager.disconnect(chat_id, websocket)
+        logger.info(f"WebSocket disconnected from chat {chat_id} for user {user_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error in chat {chat_id}: {str(e)}")
+    finally:
+        ws_manager.disconnect(chat_id, websocket, user_id)
 
 locks = {}
 
@@ -438,100 +540,27 @@ async def process_chat_message_logic(user_id: str, chat_uuid: str, content: str)
 
 
 async def get_user_from_websocket(websocket: WebSocket) -> Optional[str]:
-    """
-    Extract user_id from WebSocket connection.
-    You'll need to implement this based on how you handle auth.
-    Options:
-    1. Pass token in query parameters: ws://host/ws/chat_id?token=jwt_token
-    2. Pass user_id in first message
-    3. Extract from headers during connection
-    """
-    # Option 1: From query parameters
+    """Extract user_id from WebSocket connection via query param or header"""
     query_params = dict(websocket.query_params)
     token = query_params.get("token")
+
     if token:
+        user_id = decode_jwt_token(token)
+        logger.debug(f"[get_user_from_websocket] token={token} -> user_id={user_id}")
+        if user_id:
+            return user_id
 
-        try:
-            # user_id = decode_jwt_token(token)  # Implement this
-            # return user_id
-            pass
-        except:
-            return None
+    # fallback to Authorization header
+    auth_header = websocket.headers.get("authorization")
+    if auth_header:
+        user_id = decode_jwt_token(auth_header)
+        if user_id:
+            return user_id
 
-    return None  # For now, return None - you'll implement auth
+    return None
 
-@router.websocket("/ws/{chat_id}")
-async def websocket_endpoint(websocket: WebSocket, chat_id: str):
-    """Enhanced WebSocket endpoint for real-time chat messaging"""
-    validate_uuid(chat_id)
-
-    # Get user_id from connection (you'll need to implement this)
-    user_id = await get_user_from_websocket(websocket)
-
-    await ws_manager.connect(chat_id, websocket, user_id)
-
-    try:
-        while True:
-            # Receive JSON data instead of plain text
-            try:
-                raw_data = await websocket.receive_text()
-                data = json.loads(raw_data)
-            except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Invalid JSON format"
-                })
-                continue
-            except Exception as e:
-                logger.error(f"WebSocket receive error: {str(e)}")
-                break
-
-            message_type = data.get("type")
-
-            if message_type == "send_message":
-                await handle_websocket_message(websocket, chat_id, data, user_id)
-            elif message_type == "typing":
-                await handle_typing_indicator(chat_id, data, user_id)
-            elif message_type == "ping":
-                await websocket.send_json({"type": "pong"})
-            elif message_type == "auth":
-                # Handle authentication after connection
-                user_id = await handle_websocket_auth(data)
-                if user_id:
-                    # Update connection with user_id
-                    ws_manager.disconnect(chat_id, websocket)
-                    await ws_manager.connect(chat_id, websocket, user_id)
-                    await websocket.send_json({
-                        "type": "auth_success",
-                        "message": "Authentication successful"
-                    })
-                else:
-                    await websocket.send_json({
-                        "type": "auth_error",
-                        "message": "Authentication failed"
-                    })
-            else:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Unknown message type: {message_type}"
-                })
-
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected from chat {chat_id}")
-    except Exception as e:
-        logger.error(f"WebSocket error in chat {chat_id}: {str(e)}")
-    finally:
-        ws_manager.disconnect(chat_id, websocket, user_id)
-
-async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dict, user_id: Optional[str]):
-    """Handle incoming chat message via WebSocket"""
-    if not user_id:
-        await websocket.send_json({
-            "type": "error",
-            "message": "Authentication required"
-        })
-        return
-
+async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dict, user_id: str):
+    """Handle incoming chat message via WebSocket (now requires user_id)"""
     content = data.get("content", "").strip()
     if not content:
         await websocket.send_json({
@@ -541,14 +570,22 @@ async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dic
         return
 
     try:
-        # Send typing indicator to other users
+        # Verify user still has access
+        if not await verify_chat_access(user_id, chat_id):
+            await websocket.send_json({
+                "type": "error",
+                "message": "Access denied to this chat"
+            })
+            return
+
+        # Send typing indicator
         await ws_manager.broadcast_to_chat(chat_id, {
             "type": "typing",
             "sender": "bot",
             "is_typing": True
         }, exclude_websocket=websocket)
 
-        # Process message using shared logic
+        # Process message ONCE
         result = await process_chat_message_logic(user_id, chat_id, content)
 
         # Stop typing indicator
@@ -556,9 +593,9 @@ async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dic
             "type": "typing",
             "sender": "bot",
             "is_typing": False
-        }, exclude_websocket=websocket)
+        })
 
-        # Send user message confirmation to sender
+        # Send confirmation + broadcast
         await websocket.send_json({
             "type": "message_sent",
             "message": {
@@ -569,7 +606,6 @@ async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dic
             }
         })
 
-        # Broadcast user message to other connections (if any)
         await ws_manager.broadcast_to_chat(chat_id, {
             "type": "new_message",
             "message": {
@@ -580,7 +616,6 @@ async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dic
             }
         }, exclude_websocket=websocket)
 
-        # Send bot response to all connections
         await ws_manager.broadcast_to_chat(chat_id, {
             "type": "new_message",
             "message": {
@@ -591,32 +626,25 @@ async def handle_websocket_message(websocket: WebSocket, chat_id: str, data: dic
             }
         })
 
-        # Handle doctor report if needed
+        # Doctor report
         if result["needs_doctor_report"]:
-            # Process doctor report in background
             asyncio.create_task(
                 process_doctor_report_with_websocket_notification(
                     user_id, chat_id, result["history_text"]
                 )
             )
-
-            # Send immediate notification about processing
             await ws_manager.send_to_user(user_id, chat_id, {
                 "type": "doctor_report_processing",
                 "message": "Your data is being processed by our doctor. You'll be notified when ready."
             })
 
-    except ValueError as e:
-        await websocket.send_json({
-            "type": "error",
-            "message": str(e)
-        })
     except Exception as e:
         logger.error(f"Error processing WebSocket message: {str(e)}")
         await websocket.send_json({
             "type": "error",
             "message": "Failed to process message"
         })
+
 
 async def handle_typing_indicator(chat_id: str, data: dict, user_id: Optional[str]):
     """Handle typing indicator"""
@@ -631,18 +659,18 @@ async def handle_typing_indicator(chat_id: str, data: dict, user_id: Optional[st
     })
 
 async def handle_websocket_auth(data: dict) -> Optional[str]:
-    """Handle WebSocket authentication"""
+    """Handle WebSocket authentication via message"""
     token = data.get("token")
     if not token:
+        logger.warning("WebSocket auth message missing token")
         return None
 
-    # Implement your JWT token validation here
-    try:
-        user_id = decode_jwt_token(token)  # You need to implement this
+    user_id = decode_jwt_token(token)
+    if user_id:
+        logger.info(f"WebSocket authenticated via message for user: {user_id}")
         return user_id
-        return None  # Placeholder
-    except Exception as e:
-        logger.error(f"WebSocket auth error: {str(e)}")
+    else:
+        logger.warning("WebSocket auth failed - invalid token")
         return None
 
 async def process_doctor_report_with_websocket_notification(user_id: str, chat_id: str, history_text: str):

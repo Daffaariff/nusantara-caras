@@ -13,7 +13,7 @@ export default function Chat() {
   const [websocket, setWebsocket] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("disconnected");
   const [typing, setTyping] = useState({ isTyping: false, sender: null });
-  const [useWebSocket, setUseWebSocket] = useState(true); // Toggle WebSocket on/off
+  const [useWebSocket, setUseWebSocket] = useState(true);
 
   const listRef = useRef(null);
   const wsRef = useRef(null);
@@ -31,7 +31,8 @@ export default function Chat() {
       }
 
       try {
-        const { data } = await api.post("/chat/start", {});
+        // FIX: Use correct endpoint for getting chat list
+        const { data } = await api.get("/chat/list");
         setChats(data.chats || []);
       } catch (e) {
         console.error("Failed to fetch chats:", e);
@@ -52,79 +53,75 @@ export default function Chat() {
 
   // WebSocket connection effect
   useEffect(() => {
-    if (chatId && useWebSocket) {
+    if (!chatId || !useWebSocket) return;
+
+    // Only connect if not already connected
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       connectWebSocket(chatId);
-    } else {
-      disconnectWebSocket();
     }
 
-    return () => disconnectWebSocket();
+    return () => {
+      // Disconnect only on component unmount
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
   }, [chatId, useWebSocket]);
 
   function connectWebSocket(currentChatId) {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return; // Already connected
-    }
-
-    try {
-      const token = localStorage.getItem("token");
-
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/api/chat/ws/${currentChatId}${token ? `?token=${token}` : ''}`;
-
-      console.log("Connecting to WebSocket:", wsUrl);
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log("WebSocket connected");
-        setConnectionStatus("connected");
-        setWebsocket(ws);
-
-        // Authenticate if needed
-        if (token) {
-          ws.send(JSON.stringify({
-            type: "auth",
-            token: token
-          }));
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          handleWebSocketMessage(data);
-        } catch (e) {
-          console.error("Failed to parse WebSocket message:", e);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setConnectionStatus("error");
-      };
-
-      ws.onclose = () => {
-        console.log("WebSocket disconnected");
-        setConnectionStatus("disconnected");
-        setWebsocket(null);
-        wsRef.current = null;
-
-        // Auto-reconnect after 3 seconds
-        if (currentChatId && useWebSocket) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            console.log("Attempting to reconnect WebSocket...");
-            connectWebSocket(currentChatId);
-          }, 3000);
-        }
-      };
-
-    } catch (error) {
-      console.error("Failed to create WebSocket connection:", error);
-      setConnectionStatus("error");
-    }
+  if (
+    wsRef.current &&
+    (wsRef.current.readyState === WebSocket.OPEN ||
+     wsRef.current.readyState === WebSocket.CONNECTING)
+  ) {
+    console.log("WebSocket already active, skipping reconnect");
+    return;
   }
+
+  const token = localStorage.getItem("token");
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const hostname = window.location.hostname;
+  const backendPort = "10400";
+  const wsUrl = `${protocol}//${hostname}:${backendPort}/chat/ws/${currentChatId}${
+    token ? `?token=${token}` : ""
+  }`;
+
+  console.log("Connecting to WebSocket:", wsUrl);
+  const ws = new WebSocket(wsUrl);
+  wsRef.current = ws;
+
+  ws.onopen = () => {
+    console.log("WebSocket connected");
+    setConnectionStatus("connected");
+    setWebsocket(ws);
+  };
+
+  // ⬇️ Add the message handler here
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      handleWebSocketMessage(data);
+    } catch (e) {
+      console.error("Failed to parse WebSocket message:", e);
+    }
+  };
+
+  ws.onclose = (event) => {
+    console.log("WebSocket closed:", event.code, event.reason);
+    setConnectionStatus("disconnected");
+    setWebsocket(null);
+    wsRef.current = null;
+
+    if (event.code !== 4001 && useWebSocket) {
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connectWebSocket(currentChatId);
+      }, 3000);
+    }
+  };
+}
+
+
 
   function disconnectWebSocket() {
     if (reconnectTimeoutRef.current) {
@@ -144,9 +141,32 @@ export default function Chat() {
     console.log("WebSocket message received:", data);
 
     switch (data.type) {
+      case "auth_required":
+        console.log("WebSocket authentication required");
+        // Send token if we have one
+        const token = localStorage.getItem("token");
+        if (token && websocket) {
+          websocket.send(JSON.stringify({
+            type: "auth",
+            token: token
+          }));
+        }
+        break;
+
+      case "auth_success":
+        console.log("WebSocket authentication successful");
+        setConnectionStatus("connected");
+        break;
+
+      case "auth_error":
+        console.error("WebSocket authentication failed:", data.message);
+        setConnectionStatus("error");
+        setUseWebSocket(false);
+        alert("Real-time connection failed. Using standard mode.");
+        break;
+
       case "new_message":
         setMessages(prev => {
-          // Check if message already exists to prevent duplicates
           const exists = prev.some(m => m.id === data.message.id);
           if (exists) return prev;
 
@@ -159,7 +179,6 @@ export default function Chat() {
         break;
 
       case "message_sent":
-        // Update temp message with server ID
         setMessages(prev => {
           const updated = [...prev];
           const tempIndex = updated.findIndex(m => m.id?.startsWith('temp_'));
@@ -181,7 +200,6 @@ export default function Chat() {
           });
 
           if (data.is_typing) {
-            // Clear typing after 10 seconds max
             if (typingTimeoutRef.current) {
               clearTimeout(typingTimeoutRef.current);
             }
@@ -216,27 +234,50 @@ export default function Chat() {
 
       case "error":
         console.error("WebSocket error:", data.message);
-        alert(`Error: ${data.message}`);
+
+        // Handle specific authentication errors
+        if (data.message.includes("authenticate") || data.message.includes("access denied")) {
+          setUseWebSocket(false);
+          alert("Authentication failed. Switching to standard mode.");
+        } else {
+          alert(`Error: ${data.message}`);
+        }
         break;
 
       case "pong":
         // Keep-alive response
         break;
 
-      case "auth_success":
-        console.log("WebSocket authentication successful");
-        break;
-
-      case "auth_error":
-        console.error("WebSocket authentication failed");
-        // Fall back to REST mode
-        setUseWebSocket(false);
-        break;
-
       default:
         console.log("Unknown WebSocket message type:", data.type);
     }
   }
+
+  // Token expiration check
+  useEffect(() => {
+    const checkTokenExpiration = () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        // Basic JWT expiration check
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const now = Math.floor(Date.now() / 1000);
+
+        // If token expires in less than 5 minutes
+        if (payload.exp && payload.exp - now < 300) {
+          console.log("Token expiring soon");
+          // You might want to refresh token here
+        }
+      } catch (e) {
+        console.error("Error checking token expiration:", e);
+      }
+    };
+
+    // Check every 5 minutes
+    const interval = setInterval(checkTokenExpiration, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   function scrollToBottom() {
     setTimeout(() => {
@@ -262,7 +303,6 @@ export default function Chat() {
     const text = input.trim();
     setInput("");
 
-    // Generate temp message ID
     const tempId = `temp_${Date.now()}`;
     const userMsg = {
       id: tempId,
@@ -271,36 +311,32 @@ export default function Chat() {
       created_at: new Date().toISOString()
     };
 
-    // Add user message to UI immediately
     setMessages((m) => [...m, userMsg]);
     scrollToBottom();
-
     setSending(true);
 
-    // Try WebSocket first if available
-    if (websocket && websocket.readyState === WebSocket.OPEN && chatId) {
+    // Try WebSocket first if available and authenticated
+    if (websocket && websocket.readyState === WebSocket.OPEN && chatId && connectionStatus === "connected") {
       try {
         websocket.send(JSON.stringify({
           type: "send_message",
           content: text
         }));
 
-        // WebSocket handles the response, just clean up
         setSending(false);
         return;
 
       } catch (wsError) {
         console.warn("WebSocket send failed, falling back to REST:", wsError);
-        // Fall through to REST API
       }
     }
 
-    // REST API fallback (existing logic)
+    // REST API fallback (your existing logic)
     try {
       let currentChatId = chatId;
 
       if (!currentChatId || currentChatId === "undefined") {
-        console.log("Creating new chat with first message using combined endpoint");
+        console.log("Creating new chat with first message");
 
         const { data } = await api.post("/chat/start-with-message", {
           content: text
@@ -310,7 +346,6 @@ export default function Chat() {
         setChatId(data.chat_id);
         setMessages(data.messages || []);
 
-        // Refresh chat list
         try {
           const { data: chatsData } = await api.get("/chat/list");
           setChats(chatsData.chats || []);
@@ -326,7 +361,6 @@ export default function Chat() {
           content: text
         });
 
-        // Replace temp message with server response
         setMessages((m) => [
           ...m.filter((x) => x.id !== tempId),
           {
@@ -355,11 +389,8 @@ export default function Chat() {
 
     } catch (error) {
       console.error("Failed to send message:", error);
-
-      // Remove the temporary message on error
       setMessages((m) => m.filter((x) => x.id !== tempId));
 
-      // Handle specific errors (existing logic)
       if (error.response?.status === 403 || error.response?.status === 404) {
         console.warn("Chat access error, creating new chat...");
         localStorage.removeItem("chat_id");
@@ -390,12 +421,11 @@ export default function Chat() {
     }
   }
 
-  // Send typing indicator
   function handleInputChange(e) {
     setInput(e.target.value);
 
     // Send typing indicator via WebSocket
-    if (websocket && websocket.readyState === WebSocket.OPEN) {
+    if (websocket && websocket.readyState === WebSocket.OPEN && connectionStatus === "connected") {
       websocket.send(JSON.stringify({
         type: "typing",
         is_typing: e.target.value.length > 0
@@ -411,6 +441,12 @@ export default function Chat() {
       setMessages(data.messages || []);
       localStorage.setItem("chat_id", data.chat_id);
 
+      if (useWebSocket) {
+        disconnectWebSocket();
+        connectWebSocket(data.chat_id);
+      }
+
+
       const { data: chatsData } = await api.get("/chat/list");
       setChats(chatsData.chats || []);
 
@@ -422,18 +458,21 @@ export default function Chat() {
   }
 
   async function clearChat() {
-    try {
-      await api.delete("/chat/clear");
-      localStorage.removeItem("chat_id");
-      setChatId("");
-      setMessages([]);
-      setChats([]);
-    } catch (e) {
-      console.error("Failed to clear chat:", e);
-    }
-  }
+  try {
+    await api.delete("/chat/clear");
+    localStorage.removeItem("chat_id");
+    setChatId("");
+    setMessages([]);
+    setChats([]);
 
-  // Connection status indicator
+    // Disconnect from old WebSocket
+    disconnectWebSocket();
+  } catch (e) {
+    console.error("Failed to clear chat:", e);
+  }
+}
+
+
   const getStatusColor = () => {
     switch (connectionStatus) {
       case "connected": return "text-green-400";
@@ -485,7 +524,6 @@ export default function Chat() {
           ))}
         </div>
         <div className="p-4 space-y-2 border-t border-white/10">
-          {/* WebSocket toggle */}
           <label className="flex items-center text-xs text-gray-400">
             <input
               type="checkbox"
@@ -509,7 +547,6 @@ export default function Chat() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
         <header className="shrink-0 h-14 border-b border-white/10 flex items-center px-4 justify-between">
           <div className="flex items-center">
             <button
@@ -523,7 +560,6 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Connection status */}
           <div className={`text-xs ${getStatusColor()} flex items-center`}>
             <span className={`w-2 h-2 rounded-full mr-2 ${
               connectionStatus === "connected" ? "bg-green-400" :
@@ -534,7 +570,6 @@ export default function Chat() {
           </div>
         </header>
 
-        {/* Messages */}
         <main className="flex-1 overflow-hidden">
           <div ref={listRef} className="h-full overflow-y-auto max-w-5xl mx-auto px-4 py-6 space-y-3">
             {messages.length === 0 && (
@@ -560,7 +595,6 @@ export default function Chat() {
               </div>
             ))}
 
-            {/* Typing indicator */}
             {typing.isTyping && typing.sender === "bot" && (
               <div className="flex justify-start">
                 <div className="bg-gray-800 rounded-xl px-4 py-3 rounded-bl-sm">
@@ -575,7 +609,6 @@ export default function Chat() {
           </div>
         </main>
 
-        {/* Composer */}
         <footer className="shrink-0 border-t border-white/10">
           <div className="max-w-5xl mx-auto p-4 flex gap-2">
             <input

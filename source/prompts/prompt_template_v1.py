@@ -17,5 +17,9 @@ FINAL_REPORT_TEMPLATE = """
 - Management Plan: {management_plan}
 - Prognosis: {prognosis}
 - Doctor’s Prescription: {doctors_prescription}
+- medicine : {medicines}
 - Patient Summary: {summary}
+- username : {display_name}
+- hospital : {hospital}
+- language user : {lang}
 """

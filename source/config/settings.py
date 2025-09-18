@@ -28,11 +28,15 @@ class Settings(BaseSettings):
 
     SEALION_MODEL_NAME: Optional[str] = None
     SEALION_BASE_URL: Optional[str] = None
-    
+
     MEDGEMMA_MODEL_NAME: Optional[str] = None
     MEDGEMMA_BASE_URL: Optional[str] = None
 
     SAGEMAKER_ENDPOINT: Optional[str] = None
+
+    JWT_SECRET: Optional[str] = None
+    JTW_ALGORITHM: Optional[str] = None
+
 
     # Allowed origins (for CORS)
     ALLOWED_HOSTS: List[str] = ["*"]
