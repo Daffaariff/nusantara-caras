@@ -28,7 +28,7 @@ It acts as a **virtual doctor assistant**, capable of understanding and respondi
 - **Real-time**: WebSocket (FastAPI + custom manager)
 - **AI Models**:
   - [SEA-LION](https://huggingface.co/aisingapore/Gemma-SEA-LION-v4-27B-IT) — multilingual local language understanding
-  - [MedGEMMA] (https://huggingface.co/google/medgemma-27b-it) — medical domain reasoning
+  - [MedGEMMA](https://huggingface.co/google/medgemma-27b-it) — medical domain reasoning
   - Custom reranker + parser agents
 
 ---
