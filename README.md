@@ -1,6 +1,6 @@
 # 🌏 Nusantara CaRas — Multilingual Medical Chatbot
 
-![Project Banner](./assets/caras_logo.png)
+![Project Banner](./source/assets/caras_logo.png)
 
 
 **Nusantara CaRas** (Cultural & Regional Aware Symptom Assistant) is an AI-powered medical chatbot designed for communities in Indonesia.
