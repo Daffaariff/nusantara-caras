@@ -152,7 +152,7 @@ async def main():
         agent_name="simplified_agent",
         system_prompt="You are an AI assistant specialized in processing and analyzing text data with characteristics such as {persona}. Please analyze the following content.",
         human_prompt="Here is the content: {input_text}",
-        api_key="AIzaSyD2kY8qdrsUgVTk0kzKDTMS9xiB-X-T-zg",  # Replace with your actual API key
+        api_key="",  # Replace with your actual API key
         model_name="gemini-1.5-flash",
         max_retries=3,
         timeout=180,
